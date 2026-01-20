@@ -90,6 +90,16 @@ public class HTMLTagBalancer
     protected static final String IGNORE_OUTSIDE_CONTENT
                             = "http://cyberneko.org/html/features/balance-tags/ignore-outside-content";
 
+    /**
+     * Allow nested body elements.
+     * When enabled, nested body elements (e.g., from Angular components) are preserved
+     * in the DOM tree instead of being discarded. This is useful for parsing HTML from
+     * modern web frameworks where components may incorrectly include body elements.
+     * Default is false to maintain backward compatibility.
+     */
+    public static final String ALLOW_NESTED_BODY
+                            = "http://cyberneko.org/html/features/balance-tags/allow-nested-body";
+
     /** Recognized features. */
     private static final String[] RECOGNIZED_FEATURES = {
         NAMESPACES,
@@ -97,6 +107,7 @@ public class HTMLTagBalancer
         REPORT_ERRORS,
         DOCUMENT_FRAGMENT,
         IGNORE_OUTSIDE_CONTENT,
+        ALLOW_NESTED_BODY,
     };
 
     /** Recognized features defaults. */
@@ -104,6 +115,7 @@ public class HTMLTagBalancer
         null,
         null,
         null,
+        Boolean.FALSE,
         Boolean.FALSE,
         Boolean.FALSE,
     };
@@ -177,6 +189,9 @@ public class HTMLTagBalancer
 
     /** Allows self closing tags. */
     protected boolean fAllowSelfclosingTags;
+
+    /** Allow nested body elements. */
+    protected boolean fAllowNestedBody;
 
     // properties
 
@@ -323,6 +338,7 @@ public class HTMLTagBalancer
         fReportErrors = manager.getFeature(REPORT_ERRORS);
         fDocumentFragment = manager.getFeature(DOCUMENT_FRAGMENT);
         fIgnoreOutsideContent = manager.getFeature(IGNORE_OUTSIDE_CONTENT);
+        fAllowNestedBody = manager.getFeature(ALLOW_NESTED_BODY);
         fAllowSelfclosingIframe = manager.getFeature(HTMLScanner.ALLOW_SELFCLOSING_IFRAME);
         fAllowSelfclosingScript = manager.getFeature(HTMLScanner.ALLOW_SELFCLOSING_SCRIPT);
         fAllowSelfclosingTags = manager.getFeature(HTMLScanner.ALLOW_SELFCLOSING_TAGS);
@@ -717,10 +733,15 @@ public class HTMLTagBalancer
             consumeBufferedEndElements(); // </head> (if any) has been buffered
 
             if (fSeenBodyElement) {
-                notifyDiscardedStartElement(elem, attrs, augs);
-                return;
+                if (!fAllowNestedBody) {
+                    notifyDiscardedStartElement(elem, attrs, augs);
+                    return;
+                }
+                // When allowing nested body, continue to add it as a regular element
             }
-            fSeenBodyElement = true;
+            else {
+                fSeenBodyElement = true;
+            }
         }
         else if (elementCode == HTMLElements.FORM) {
             if (fOpenedForm) {

@@ -83,6 +83,15 @@ public class HTMLConfiguration extends ParserConfigurationSettings implements XM
     /** Simple report format. */
     protected static final String SIMPLE_ERROR_FORMAT = "http://cyberneko.org/html/features/report-errors/simple";
 
+    /**
+     * Balance tags.
+     * When enabled (default), the tag balancer component is included in the parsing pipeline
+     * to fix malformed HTML (missing tags, mismatched tags, etc.).
+     * When disabled, the tag balancer is bypassed - useful for parsing HTML that has already
+     * been balanced by a browser (e.g., when using WebDriver to get page source).
+     */
+    public static final String BALANCE_TAGS = "http://cyberneko.org/html/features/balance-tags";
+
     // properties
 
     /** Modify HTML element names: { "upper", "lower", "default" }. */
@@ -152,12 +161,14 @@ public class HTMLConfiguration extends ParserConfigurationSettings implements XM
             NAMESPACES,
             REPORT_ERRORS,
             SIMPLE_ERROR_FORMAT,
+            BALANCE_TAGS,
         };
         addRecognizedFeatures(recognizedFeatures);
         setFeature(AUGMENTATIONS, false);
         setFeature(NAMESPACES, true);
         setFeature(REPORT_ERRORS, false);
         setFeature(SIMPLE_ERROR_FORMAT, false);
+        setFeature(BALANCE_TAGS, true);
 
         // recognized properties
         final String[] recognizedProperties = {
@@ -415,15 +426,28 @@ public class HTMLConfiguration extends ParserConfigurationSettings implements XM
 
         // configure pipeline
         XMLDocumentSource lastSource = documentScanner_;
-        if (getFeature(NAMESPACES)) {
-            lastSource.setDocumentHandler(namespaceBinder_);
-            namespaceBinder_.setDocumentSource(tagBalancer_);
-            lastSource = namespaceBinder_;
-        }
 
-        lastSource.setDocumentHandler(tagBalancer_);
-        tagBalancer_.setDocumentSource(documentScanner_);
-        lastSource = tagBalancer_;
+        // Include tag balancer if BALANCE_TAGS is enabled
+        final boolean balanceTags = getFeature(BALANCE_TAGS);
+        if (balanceTags) {
+            if (getFeature(NAMESPACES)) {
+                lastSource.setDocumentHandler(namespaceBinder_);
+                namespaceBinder_.setDocumentSource(tagBalancer_);
+                lastSource = namespaceBinder_;
+            }
+
+            lastSource.setDocumentHandler(tagBalancer_);
+            tagBalancer_.setDocumentSource(documentScanner_);
+            lastSource = tagBalancer_;
+        }
+        else {
+            // When tag balancing is disabled, connect namespace binder directly to scanner
+            if (getFeature(NAMESPACES)) {
+                lastSource.setDocumentHandler(namespaceBinder_);
+                namespaceBinder_.setDocumentSource(documentScanner_);
+                lastSource = namespaceBinder_;
+            }
+        }
 
         final XMLDocumentFilter[] filters = (XMLDocumentFilter[]) getProperty(FILTERS);
         if (filters != null) {
